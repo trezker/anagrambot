@@ -4,13 +4,6 @@ import std.regex;
 import std.algorithm;
 import std.string;
 
-void ParseIrcMessage(char[] rawmessage, out char[] nick, out char[] peer, out char[] command, out char[] message) {
-	//:ragaman!~ragaman@h203n1-sde-a31.ias.bredband.telia.com JOIN ##anagram
-	//PING :card.freenode.net
-	nick = rawmessage[1 .. indexOf(rawmessage, "!")]; 
-	peer = rawmessage[indexOf(rawmessage, "!") .. indexOf(rawmessage, " ")];
-}
-
 bool Send(Socket s, string msg) {
 	auto result = s.send(msg);
 	writeln("<", msg);
@@ -38,13 +31,18 @@ void main() {
 		//writeln("Received: ", received);
 		writeln(">", receivebuffer);
 		
-		char[] nick;
-		char[] peer;
-		char[] command;
-		char[] channel;
-		char[] message;
+		if(startsWith(receivebuffer, "PING")) {
+			receivebuffer[1] = 'O';
+			Send(s, receivebuffer.dup);
+		}
+		
 		auto nickend = indexOf(receivebuffer, "!");
 		if(nickend > -1 && startsWith(receivebuffer, ":")) {
+			char[] nick;
+			char[] peer;
+			char[] command;
+			char[] channel;
+			char[] message;
 			receivebuffer = stripRight(receivebuffer);
 			writeln("parsing");
 			nick = receivebuffer[1 .. nickend];
@@ -69,8 +67,10 @@ void main() {
 
 			if(command == "PRIVMSG") {
 				if(nick == "Trezker") {
-					if(message == "!quit")
+					if(message == "!quit") {
+						Send(s, ("PRIVMSG " ~ channel ~ " :Shutting down\r\n").idup);
 						break;
+					}
 				}
 			}
 		}
