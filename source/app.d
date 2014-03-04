@@ -1,10 +1,12 @@
 import std.stdio;
 import std.socket;
-import std.regex;
+//import std.regex;
 import std.algorithm;
 import std.string;
 import std.random;
 import std.conv;
+import std.datetime;
+import core.thread;
 
 // /usr/share/dict/words
 
@@ -15,6 +17,8 @@ dstring[] Load_dictionary() {
 	dstring[] lines;
 
 	foreach (str; f.byLine) {
+		if(indexOf(str.idup, "'") > -1)
+			continue;
 		lines ~= to!dstring(str.idup);
 	}
 
@@ -38,6 +42,7 @@ void main() {
 	
 	Socket s = new TcpSocket();
 	s.connect(new InternetAddress("irc.freenode.net", 6667));
+	s.blocking = false;
 
 	if(!Send(s, "NICK ragaman")) {
 		writeln("Failed send");
@@ -48,10 +53,32 @@ void main() {
 	if(!Send(s, "JOIN ##anagram")) {
 		writeln("Failed send");
 	}
-
+	
+	StopWatch sw;
+	sw.stop();
+	sw.reset();
 	while(true) {
+		Thread.sleep( dur!("msecs")( 50 ) );
+		if(sw.running && sw.peek().seconds > 30) {
+			Privmsg(s, "##anagram", ("Time's up, the word was: " ~ to!string(currentword)));
+			ulong number = uniform(0, dict.length);
+			currentword = dict[number].dup;
+			shuffledword = dict[number].dup;
+			randomShuffle(shuffledword);
+			Privmsg(s, "##anagram", ("Unscramble: " ~ to!string(shuffledword)));
+			sw.reset();
+		}
+
 		char[1024] buffer;
 		auto received = s.receive(buffer);
+		if(received == Socket.ERROR) {
+			continue;
+		}
+		
+		if(received == 0) {
+			continue;
+		}
+		
 		auto receivebuffer = buffer[0 .. received];
 		//writeln("Received: ", received);
 		writeln(">", receivebuffer);
@@ -97,14 +124,33 @@ void main() {
 						break;
 					}
 				}
+				if(message == "!stop") {
+					sw.stop();
+					currentword = to!dstring("");
+					Privmsg(s, channel.idup, ("Stopping, use !start to play."));
+				}
 				if(message == "!start") {
 					ulong number = uniform(0, dict.length);
 					currentword = dict[number].dup;
 					shuffledword = dict[number].dup;
 					randomShuffle(shuffledword);
+					/*
 					Privmsg(s, channel.idup, ("Number: " ~ to!string(number)).idup);
 					Privmsg(s, channel.idup, ("Word: " ~ to!string(currentword)));
 					Privmsg(s, channel.idup, ("Word: " ~ to!string(shuffledword)));
+					*/
+					writeln(("Word: " ~ to!string(currentword)));
+					Privmsg(s, channel.idup, ("Unscramble: " ~ to!string(shuffledword)));
+					sw.start();
+				}
+				if(toLower(strip(message)) == toLower(to!string(currentword))) {
+					Privmsg(s, channel.idup, (nick.idup ~ " is correct: " ~ to!string(currentword)));
+					ulong number = uniform(0, dict.length);
+					currentword = dict[number].dup;
+					shuffledword = dict[number].dup;
+					randomShuffle(shuffledword);
+					Privmsg(s, channel.idup, ("Unscramble: " ~ to!string(shuffledword)));
+					sw.reset();
 				}
 			}
 		}
