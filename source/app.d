@@ -54,6 +54,7 @@ void main() {
 		writeln("Failed send");
 	}
 	
+	StopWatch inactivitysw;
 	StopWatch sw;
 	sw.stop();
 	sw.reset();
@@ -61,11 +62,17 @@ void main() {
 		Thread.sleep( dur!("msecs")( 50 ) );
 		if(sw.running && sw.peek().seconds > 30) {
 			Privmsg(s, "##anagram", ("Time's up, the word was: " ~ to!string(currentword)));
-			ulong number = uniform(0, dict.length);
-			currentword = dict[number].dup;
-			shuffledword = dict[number].dup;
-			randomShuffle(shuffledword);
-			Privmsg(s, "##anagram", ("Unscramble: " ~ to!string(shuffledword)));
+			if(inactivitysw.peek().seconds() > 600) {
+				Privmsg(s, "##anagram", ("Ten minutes inactivity, stopping the game."));
+				sw.stop();
+				currentword = to!dstring("");
+			} else {
+				ulong number = uniform(0, dict.length);
+				currentword = dict[number].dup;
+				shuffledword = dict[number].dup;
+				randomShuffle(shuffledword);
+				Privmsg(s, "##anagram", ("Unscramble: " ~ to!string(shuffledword)));
+			}
 			sw.reset();
 		}
 
@@ -142,6 +149,8 @@ void main() {
 					writeln(("Word: " ~ to!string(currentword)));
 					Privmsg(s, channel.idup, ("Unscramble: " ~ to!string(shuffledword)));
 					sw.start();
+					inactivitysw.start();
+					inactivitysw.reset();
 				}
 				if(toLower(strip(message)) == toLower(to!string(currentword))) {
 					Privmsg(s, channel.idup, (nick.idup ~ " is correct: " ~ to!string(currentword)));
@@ -151,6 +160,7 @@ void main() {
 					randomShuffle(shuffledword);
 					Privmsg(s, channel.idup, ("Unscramble: " ~ to!string(shuffledword)));
 					sw.reset();
+					inactivitysw.reset();
 				}
 			}
 		}
