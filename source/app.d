@@ -26,7 +26,7 @@ void main() {
 	dstring[] dict = Load_dictionary();
 
 	Bot bot = new Bot(new TcpSocket(), Load_dictionary);
-	bot.Connect(new InternetAddress("irc.freenode.net", 6667), "ragaman-test", "##anagramtest");
+	bot.Connect(new InternetAddress("irc.freenode.net", 6667), "ragaman", "##anagram");
 	
 	while(bot.Connected) {
 		Thread.sleep( dur!("msecs")( 50 ) );

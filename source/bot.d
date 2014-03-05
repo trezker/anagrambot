@@ -110,7 +110,8 @@ public:
 			}
 			
 			auto nickend = indexOf(receivebuffer, "!");
-			if(nickend > -1 && startsWith(receivebuffer, ":")) {
+			auto peerend = indexOf(receivebuffer, " ");
+			if(nickend > -1 && startsWith(receivebuffer, ":") && nickend < peerend) {
 				char[] nick;
 				char[] peer;
 				char[] command;
@@ -118,7 +119,7 @@ public:
 				char[] message;
 				receivebuffer = stripRight(receivebuffer);
 				nick = receivebuffer[1 .. nickend];
-				peer = receivebuffer[nickend + 1 .. indexOf(receivebuffer, " ")];
+				peer = receivebuffer[nickend + 1 .. peerend];
 				auto rbs = split(receivebuffer, ' ');
 				command = rbs[1];
 				channel = rbs[2];
@@ -127,13 +128,13 @@ public:
 				if(channelend > -1 && channelend + channel.length + 2 < receivebuffer.length) {
 					message = receivebuffer[channelend + channel.length + 2 .. $];
 				}
-				/*
+				
 				writefln("Nick: '%s'", nick);
 				writefln("Peer: '%s'", peer);
 				writefln("Command: '%s'", command);
 				writefln("Channel: '%s'", channel);
 				writefln("Message: '%s'", message);
-				*/
+				
 				if(command == "PRIVMSG") {
 					if(nick == "Trezker") {
 						if(message == "!quit") {
@@ -143,8 +144,8 @@ public:
 						}
 					}
 					if(message == "!stop") {
+						Privmsg("Stopping, use !start to play. The last word was: " ~ to!string(currentword));
 						Stop();
-						Privmsg("Stopping, use !start to play.");
 					}
 					if(message == "!start") {
 						Scramble();
@@ -162,6 +163,11 @@ public:
 			}
 		}
 		catch(Exception e) {
+			try {
+				writeln("Exception!!!");
+			}
+			catch(Exception ee) {
+			}
 			Disconnect();
 		}
 	}
