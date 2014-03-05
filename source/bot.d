@@ -64,20 +64,29 @@ public:
 		return true;
 	}
 	
+	void Scramble() {
+		ulong number = uniform(0, dictionary.length);
+		currentword = dictionary[number].dup;
+		shuffledword = dictionary[number].dup;
+		randomShuffle(shuffledword);
+		Privmsg("Unscramble: " ~ to!string(shuffledword));
+		writeln("Word: " ~ to!string(currentword));
+	}
+	
+	void Stop() {
+		sw.stop();
+		currentword = to!dstring("");
+	}
+	
 	void Update() nothrow {
 		try {
 			if(sw.running && sw.peek().seconds > 30) {
 				Privmsg("Time's up, the word was: " ~ to!string(currentword));
 				if(inactivitysw.peek().seconds() > 600) {
 					Privmsg("Ten minutes inactivity, stopping the game.");
-					sw.stop();
-					currentword = to!dstring("");
+					Stop();
 				} else {
-					ulong number = uniform(0, dictionary.length);
-					currentword = dictionary[number].dup;
-					shuffledword = dictionary[number].dup;
-					randomShuffle(shuffledword);
-					Privmsg("Unscramble: " ~ to!string(shuffledword));
+					Scramble();
 				}
 				sw.reset();
 			}
@@ -134,27 +143,18 @@ public:
 						}
 					}
 					if(message == "!stop") {
-						sw.stop();
-						currentword = to!dstring("");
+						Stop();
 						Privmsg("Stopping, use !start to play.");
 					}
 					if(message == "!start") {
-						ulong number = uniform(0, dictionary.length);
-						currentword = dictionary[number].dup;
-						shuffledword = dictionary[number].dup;
-						randomShuffle(shuffledword);
-						Privmsg("Unscramble: " ~ to!string(shuffledword));
+						Scramble();
 						sw.start();
 						inactivitysw.start();
 						inactivitysw.reset();
 					}
 					if(toLower(strip(message)) == toLower(to!string(currentword))) {
 						Privmsg(nick.idup ~ " is correct: " ~ to!string(currentword));
-						ulong number = uniform(0, dictionary.length);
-						currentword = dictionary[number].dup;
-						shuffledword = dictionary[number].dup;
-						randomShuffle(shuffledword);
-						Privmsg("Unscramble: " ~ to!string(shuffledword));
+						Scramble();
 						sw.reset();
 						inactivitysw.reset();
 					}
