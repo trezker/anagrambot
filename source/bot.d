@@ -4,6 +4,7 @@ import std.datetime;
 import std.conv;
 import std.random;
 import std.string;
+import std.algorithm;
 
 class Bot {
 private:
@@ -15,6 +16,7 @@ private:
 	StopWatch sw;
 	dchar[] currentword;
 	dchar[] shuffledword;
+	int[string] score;
 
 	void Privmsg(string msg) {
 		return Send(("PRIVMSG " ~ channel ~ " :" ~ msg).idup);
@@ -154,7 +156,40 @@ public:
 						inactivitysw.reset();
 					}
 					if(toLower(strip(message)) == toLower(to!string(currentword))) {
+						score[nick.idup]++;
 						Privmsg(nick.idup ~ " is correct: " ~ to!string(currentword));
+
+						string[] sortedscore = score.keys;
+						sort!((a,b) {return score[a] > score[b];})(sortedscore);
+						
+						char[] top;
+						ulong start = 0;
+						foreach(i, name; sortedscore) {
+							if(name == nick.idup) {
+								if(i > 3)
+									start = i - 2;
+								break;
+							}
+						}
+						
+						for(ulong i = start; i < start+5; ++i) {
+							if(i >= sortedscore.length)
+								break;
+							string pos;
+							if(i == 0)
+								pos = "1st";
+							else if(i == 1)
+								pos = "2nd";
+							else if(i == 2)
+								pos = "3rd";
+							else
+								pos = to!string(i+1) ~ "th";
+							top ~= pos ~ ": " ~ sortedscore[i] ~ "(" ~ to!string(score[sortedscore[i]]) ~ ") ";
+							//writefln("%s -> %s", sortedscore, score[sortedscore]);
+						}
+						Privmsg(("Rankings: " ~ top).idup);
+						
+
 						Scramble();
 						sw.reset();
 						inactivitysw.reset();
