@@ -52,6 +52,10 @@ private:
 	StopWatch sw;
 	dchar[] currentword;
 	dchar[] shuffledword;
+	dchar[] hint;
+	bool hints_enabled = false;
+	int hintlevel = 0;
+	int hintcount = 0;
 	int[string] score;
 
 	void Privmsg(string msg) {
@@ -121,12 +125,28 @@ public:
 	}
 	
 	void Scramble() {
+		hintlevel = 0;
+		hintcount = 0;
 		ulong number = uniform(0, dictionary.length);
 		currentword = dictionary[number].dup;
 		shuffledword = dictionary[number].dup;
 		randomShuffle(shuffledword);
+		hint.length = currentword.length;
+		for(int i = 0; i < currentword.length; ++i) {
+			hint[i] = to!dchar('_');
+		}
 		Privmsg("Unscramble: " ~ to!string(shuffledword));
 		writeln("Word: " ~ to!string(currentword));
+	}
+	
+	void Reveal(ulong n) {
+		for(int i = 0; i < n; ++i) {
+			ulong p = uniform(0, currentword.length - hintcount);
+			while(hint[p] != '_')
+				++p;
+			hint[p] = currentword[p];
+			++hintcount;
+		}
 	}
 	
 	void Stop() {
@@ -136,7 +156,27 @@ public:
 	
 	void Update() nothrow {
 		try {
-			if(sw.running && sw.peek().seconds > 30) {
+			if(hints_enabled) {
+				if(hintlevel == 0 && sw.running && sw.peek().seconds > 10) {
+					int numreveal = to!int(currentword.length * 0.2);
+					++hintlevel;
+					Reveal(numreveal);
+					Privmsg("Hint 1: " ~ to!string(hint));
+				}
+				if(hintlevel == 1 && sw.running && sw.peek().seconds > 20) {
+					++hintlevel;
+					int numreveal = to!int((currentword.length-hintcount) * 0.3);
+					Reveal(numreveal);
+					Privmsg("Hint 2: " ~ to!string(hint));
+				}
+				if(hintlevel == 2 && sw.running && sw.peek().seconds > 30) {
+					++hintlevel;
+					int numreveal = to!int((currentword.length-hintcount) * 0.4);
+					Reveal(numreveal);
+					Privmsg("Hint 3: " ~ to!string(hint));
+				}
+			}
+			if(sw.running && sw.peek().seconds > 40) {
 				Privmsg("Time's up, the word was: " ~ to!string(currentword));
 				if(inactivitysw.peek().seconds() > 600) {
 					Privmsg("Ten minutes inactivity, stopping the game.");
@@ -209,6 +249,14 @@ public:
 						inactivitysw.start();
 						inactivitysw.reset();
 					}
+					if(message == "!hints on") {
+						hints_enabled = true;
+						Privmsg("Hints are enabled");
+					}
+					if(message == "!hints off") {
+						hints_enabled = false;
+						Privmsg("Hints are disabled");
+					}
 					if(toLower(strip(message)) == toLower(to!string(currentword))) {
 						score[nick.idup]++;
 						Privmsg(nick.idup ~ " is correct: " ~ to!string(currentword));
@@ -270,6 +318,7 @@ public:
 		catch(Exception e) {
 			try {
 				writeln("Exception!!!");
+				writeln(e.msg);
 			}
 			catch(Exception ee) {
 			}
