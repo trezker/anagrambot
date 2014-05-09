@@ -4,6 +4,7 @@ import std.string;
 import std.conv;
 import core.thread;
 import std.socket;
+import std.json;
 
 import bot;
 
@@ -23,6 +24,19 @@ dstring[] Load_dictionary() {
 }
 
 void main() {
+	//Try to load connection settings from file
+	//Otherwise generate that file
+	JSONValue connection = parseJSON("{}");
+	connection.object["nick"] = "test";
+	connection.object["port"] = 6667;
+	JSONValue root = parseJSON("{}");
+	root.object["connection"] = connection;
+	writeln(toJSON(&root));
+	
+	//Try to load game state from file
+	//Otherwise provide default state object to the bot
+	//The state object should have a save method so the bot can refresh the state on disk as changes occur.
+	
 	dstring[] dict = Load_dictionary();
 
 	Bot bot = new Bot(new TcpSocket(), Load_dictionary);

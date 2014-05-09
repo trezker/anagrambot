@@ -5,6 +5,42 @@ import std.conv;
 import std.random;
 import std.string;
 import std.algorithm;
+import std.json;
+import std.file;
+
+/*TODO: Hints. 3 hints. 1 character per hint per 5 characters in word.
+ * 	20% 30% 40% of remaining hidden characters
+ *  1 _
+ *  2 _ _
+ *  3 _ _ 3
+ *  4 _ _ 3 2
+ *  5 _ _ 3 2 1
+ *  6 _ _ _ 3 2 1
+ *  7 _ _ _ 3 3 2 1
+ *  8 _ _ _ 3 3 2 2 1
+ *  9 _ _ _ _ 3 3 2 2 1
+ * 10 _ _ _ _ 3 3 2 2 1 1
+ * 11 _ _ _ _ _ 3 3 2 2 1 1
+ * 12 _ _ _ _ _ 3 3 2 2 2 1 1
+ * 
+ * Points for other anagrams
+ * Create a lookup dictionary matching the sorted character set to all words containing those characters.
+ * Award 1 point for each word in that list.
+ * 
+ * Persistent storage of scores and settings.
+ * http://dlang.org/phobos/std_json.html
+ * 
+ * Connection
+ * 	server
+ * 	port
+ * 	nick
+ * 	channel
+ * Question timeout
+ * Inactivity timeout
+ * Score
+ * 	Name
+ * 	Points
+*/
 
 class Bot {
 private:
@@ -51,6 +87,24 @@ public:
 	bool Connect(InternetAddress address, string nick, string channel) nothrow {
 		this.channel = channel;
 		try {
+			if(exists("scores.json")) {
+				string json = readText("scores.json");
+				
+				writeln(json);
+				JSONValue[string] document = parseJSON(json).object;
+				JSONValue[] scores = document["scores"].array;
+
+				foreach (scoreJson; scores) {
+					JSONValue[string] s = scoreJson.object;
+
+					string name = s["nick"].str;
+					int points = to!int(s["score"].integer);
+
+					score[name] = points;
+					//writeln("Constructed: ", e);
+				}
+    		}
+			
 			socket.connect(address);
 			socket.blocking = false;
 
@@ -161,16 +215,39 @@ public:
 
 						string[] sortedscore = score.keys;
 						sort!((a,b) {return score[a] > score[b];})(sortedscore);
-						
+						/*
+{
+   "employees": [
+      { "firstName":"John" , "lastName":"Doe" },
+      { "firstName":"Anna" , "lastName":"Smith" },
+      { "firstName":"Peter" , "lastName":"Jones" }
+   ]
+}*/
+						char[] doc = "{\"scores\":[".dup;
+						foreach(i, name; sortedscore) {
+							if(i>0)
+								doc ~= ",";
+							JSONValue sc = parseJSON("{}");
+							sc.object["nick"] = name;
+							sc.object["score"] = score[sortedscore[i]];
+							doc ~= toJSON(&sc);
+						}
+						doc ~= "]}";
+						auto docjson = parseJSON(doc.idup);
+						string docstr = toJSON(&docjson, true); 
+						File file = File("scores.json", "w");
+						file.write(docstr);
+
 						char[] top;
 						ulong start = 0;
+
 						foreach(i, name; sortedscore) {
 							if(name == nick.idup) {
 								if(i > 3)
 									start = i - 2;
 								break;
 							}
-						}
+						}						
 						
 						for(ulong i = start; i < start+5; ++i) {
 							if(i >= sortedscore.length)
