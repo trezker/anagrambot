@@ -239,6 +239,9 @@ public:
 							return;
 						}
 					}
+					if(message == "!help") {
+						Privmsg("Available commands: !start, !stop, !hints on, !hints off");
+					}
 					if(message == "!stop") {
 						Privmsg("Stopping, use !start to play. The last word was: " ~ to!string(currentword));
 						Stop();
