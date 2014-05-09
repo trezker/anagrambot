@@ -215,14 +215,7 @@ public:
 
 						string[] sortedscore = score.keys;
 						sort!((a,b) {return score[a] > score[b];})(sortedscore);
-						/*
-{
-   "employees": [
-      { "firstName":"John" , "lastName":"Doe" },
-      { "firstName":"Anna" , "lastName":"Smith" },
-      { "firstName":"Peter" , "lastName":"Jones" }
-   ]
-}*/
+						
 						char[] doc = "{\"scores\":[".dup;
 						foreach(i, name; sortedscore) {
 							if(i>0)
