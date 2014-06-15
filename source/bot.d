@@ -46,7 +46,10 @@ class Bot {
 private:
 	Socket socket;
 	bool connected = false;
+	bool exit = false;
 	string channel;
+	InternetAddress address;
+	string nick;
 	dstring[] dictionary;
 	StopWatch inactivitysw;
 	StopWatch sw;
@@ -87,9 +90,15 @@ public:
 	bool Connected() const @property {
 		return connected;
 	}
+
+	bool Exit() const @property {
+		return exit;
+	}
 	
 	bool Connect(InternetAddress address, string nick, string channel) nothrow {
 		this.channel = channel;
+		this.address = address;
+		this.nick = nick;
 		try {
 			if(exists("scores.json")) {
 				string json = readText("scores.json");
@@ -231,11 +240,15 @@ public:
 				writefln("Channel: '%s'", channel);
 				writefln("Message: '%s'", message);
 				
-				if(command == "PRIVMSG") {
+				if(command == "QUIT" && nick == this.nick) {
+					Disconnect();
+				}
+				else if(command == "PRIVMSG") {
 					if(nick == "Trezker") {
 						if(message == "!quit") {
 							Privmsg("Shutting down");
 							Disconnect();
+							exit = true;
 							return;
 						}
 					}

@@ -42,7 +42,11 @@ void main() {
 	Bot bot = new Bot(new TcpSocket(), Load_dictionary);
 	bot.Connect(new InternetAddress("irc.freenode.net", 6667), "ragaman", "##anagram");
 	
-	while(bot.Connected) {
+	while(!bot.Exit) {
+		if(!bot.Connected) {
+			bot = new Bot(new TcpSocket(), Load_dictionary);
+			bot.Connect(new InternetAddress("irc.freenode.net", 6667), "ragaman", "##anagram");
+		}
 		Thread.sleep( dur!("msecs")( 50 ) );
 		bot.Update();
 	}
