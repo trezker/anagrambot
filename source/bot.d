@@ -160,7 +160,7 @@ public:
 	
 	void Stop() {
 		sw.stop();
-		currentword = to!dstring("");
+		currentword = [];
 	}
 	
 	void Update() nothrow {
