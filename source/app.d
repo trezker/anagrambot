@@ -10,7 +10,8 @@ import bot;
 
 dstring[] Load_dictionary() {
 	writeln("Loading dictionary from '/usr/share/dict/words'");
-	auto f = File("/usr/share/dict/words");
+	//auto f = File("/usr/share/dict/words");
+	auto f = File("words");
 	scope(exit) f.close();
 	dstring[] lines;
 
