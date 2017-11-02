@@ -40,13 +40,18 @@ void main() {
 	
 	dstring[] dict = Load_dictionary();
 
-	Bot bot = new Bot(new TcpSocket(), Load_dictionary);
-	bot.Connect(new InternetAddress("irc.freenode.net", 6667), "ragaman", "##anagram");
-	
+	Bot bot = new Bot(new TcpSocket(), dict);
 	while(!bot.Exit) {
-		if(!bot.Connected) {
-			bot = new Bot(new TcpSocket(), Load_dictionary);
-			bot.Connect(new InternetAddress("irc.freenode.net", 6667), "ragaman", "##anagram");
+		while(!bot.Connected) {
+			try {
+				bot = new Bot(new TcpSocket(), dict);
+				auto address = new InternetAddress("irc.freenode.net", 6667);
+				bot.Connect(address, "ragaman", "##anagram");
+			}
+			catch(Exception e) {
+				writeln(e.msg);
+				Thread.sleep( dur!("msecs")( 5000 ) );
+			}
 		}
 		Thread.sleep( dur!("msecs")( 50 ) );
 		bot.Update();
