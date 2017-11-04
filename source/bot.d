@@ -234,7 +234,7 @@ public:
 
 	void ShowHelp(Message message) {
 		if(message.message == "!help") {
-			Privmsg("Available commands: !start, !stop, !hints on, !hints off, !scores");
+			Privmsg("Available commands: !start, !stop, !hints on, !hints off, !scores [n]");
 		}
 	}
 
@@ -269,8 +269,17 @@ public:
 	}
 
 	void ShowScores(Message message) {
-		if(message.message == "!scores") {
-			ShowScoresFromPosition(0, NicksSortedByScore());
+		auto messageParts = split(message.message, ' ');
+		if(messageParts[0] == "!scores") {
+			ulong i = 0;
+			if(messageParts.length > 1) {
+				try {
+					i = to!ulong(messageParts[1]) - 1;
+				}
+				catch(Exception e) {
+				}
+			}
+			ShowScoresFromPosition(i, NicksSortedByScore());
 		}
 	}
 
