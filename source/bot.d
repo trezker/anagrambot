@@ -133,42 +133,6 @@ public:
 		return true;
 	}
 	
-	void Scramble() {
-		hintlevel = 0;
-		hintcount = 0;
-		ulong number = uniform(0, dictionary.length);
-		currentword = dictionary[number].dup;
-		shuffledword = dictionary[number].dup;
-		randomShuffle(shuffledword);
-		hint.length = currentword.length;
-		for(int i = 0; i < currentword.length; ++i) {
-			hint[i] = to!dchar('_');
-		}
-		Privmsg("Unscramble: " ~ to!string(shuffledword));
-		writeln("Word: " ~ to!string(currentword));
-	}
-	
-	void Reveal(ulong n) {
-		for(int i = 0; i < n; ++i) {
-			ulong p = uniform(0, currentword.length - hintcount);
-			while(hint[p] != '_')
-				++p;
-			hint[p] = currentword[p];
-			++hintcount;
-		}
-	}
-	
-	void Stop() {
-		stopWatch.stop();
-		currentword = [];
-	}
-
-	void RespondToPing(char[] receivebuffer) {
-		if(startsWith(receivebuffer, "PING")) {
-			receivebuffer[1] = 'O';
-			Send(receivebuffer.dup);
-		}
-	}
 
 	void Update() nothrow {
 		try {
@@ -186,7 +150,6 @@ public:
 				return;
 			}
 			
-
 			auto receivebuffer = buffer[0 .. received];
 			writeln(">", receivebuffer);
 			
@@ -218,95 +181,8 @@ public:
 				writefln("Channel: '%s'", channel);
 				writefln("Message: '%s'", message);
 				
-				if(command == "QUIT" && nick == this.nick) {
-					Disconnect();
-				}
-				else if(command == "PRIVMSG") {
-					if(nick == "Trezker") {
-						if(message == "!quit") {
-							Privmsg("Shutting down");
-							Disconnect();
-							exit = true;
-							return;
-						}
-					}
-					if(message == "!help") {
-						Privmsg("Available commands: !start, !stop, !hints on, !hints off");
-					}
-					if(message == "!stop") {
-						Privmsg("Stopping, use !start to play. The last word was: " ~ to!string(currentword));
-						Stop();
-					}
-					if(message == "!start") {
-						Scramble();
-						stopWatch.start();
-						inactivityStopWatch.start();
-						inactivityStopWatch.reset();
-					}
-					if(message == "!hints on") {
-						hints_enabled = true;
-						Privmsg("Hints are enabled");
-					}
-					if(message == "!hints off") {
-						hints_enabled = false;
-						Privmsg("Hints are disabled");
-					}
-					if(toLower(strip(message)) == toLower(to!string(currentword))) {
-						score[nick.idup]++;
-						Privmsg(nick.idup ~ " is correct: " ~ to!string(currentword));
-
-						string[] sortedscore = score.keys;
-						sort!((a,b) {return score[a] > score[b];})(sortedscore);
-						
-						char[] doc = "{\"scores\":[".dup;
-						foreach(i, name; sortedscore) {
-							if(i>0)
-								doc ~= ",";
-							JSONValue sc = parseJSON("{}");
-							sc.object["nick"] = name;
-							sc.object["score"] = score[sortedscore[i]];
-							doc ~= toJSON(&sc);
-						}
-						doc ~= "]}";
-						auto docjson = parseJSON(doc.idup);
-						string docstr = toJSON(&docjson, true); 
-						File file = File("scores.json", "w");
-						file.write(docstr);
-
-						char[] top;
-						ulong start = 0;
-
-						foreach(i, name; sortedscore) {
-							if(name == nick.idup) {
-								if(i > 3)
-									start = i - 2;
-								break;
-							}
-						}						
-						
-						for(ulong i = start; i < start+5; ++i) {
-							if(i >= sortedscore.length)
-								break;
-							string pos;
-							if(i == 0)
-								pos = "1st";
-							else if(i == 1)
-								pos = "2nd";
-							else if(i == 2)
-								pos = "3rd";
-							else
-								pos = to!string(i+1) ~ "th";
-							top ~= pos ~ ": " ~ sortedscore[i] ~ "(" ~ to!string(score[sortedscore[i]]) ~ ") ";
-							//writefln("%s -> %s", sortedscore, score[sortedscore]);
-						}
-						Privmsg(("Rankings: " ~ top).idup);
-						
-
-						Scramble();
-						stopWatch.reset();
-						inactivityStopWatch.reset();
-					}
-				}
+				DisconnectIfBotQuits(command, nick);
+				HandleMessage(command, message, nick);
 			}
 		}
 		catch(Exception e) {
@@ -316,6 +192,100 @@ public:
 			}
 			catch(Exception ee) {
 			}
+			Disconnect();
+		}
+	}
+
+	void HandleMessage(char[] command, char[] message, char[] nick) {
+		if(command == "PRIVMSG") {
+			if(nick == "Trezker") {
+				if(message == "!quit") {
+					Privmsg("Shutting down");
+					Disconnect();
+					exit = true;
+					return;
+				}
+			}
+			if(message == "!help") {
+				Privmsg("Available commands: !start, !stop, !hints on, !hints off");
+			}
+			if(message == "!stop") {
+				Privmsg("Stopping, use !start to play. The last word was: " ~ to!string(currentword));
+				Stop();
+			}
+			if(message == "!start") {
+				Scramble();
+				stopWatch.start();
+				inactivityStopWatch.start();
+				inactivityStopWatch.reset();
+			}
+			if(message == "!hints on") {
+				hints_enabled = true;
+				Privmsg("Hints are enabled");
+			}
+			if(message == "!hints off") {
+				hints_enabled = false;
+				Privmsg("Hints are disabled");
+			}
+			if(toLower(strip(message)) == toLower(to!string(currentword))) {
+				score[nick.idup]++;
+				Privmsg(nick.idup ~ " is correct: " ~ to!string(currentword));
+
+				string[] sortedscore = score.keys;
+				sort!((a,b) {return score[a] > score[b];})(sortedscore);
+				
+				char[] doc = "{\"scores\":[".dup;
+				foreach(i, name; sortedscore) {
+					if(i>0)
+						doc ~= ",";
+					JSONValue sc = parseJSON("{}");
+					sc.object["nick"] = name;
+					sc.object["score"] = score[sortedscore[i]];
+					doc ~= toJSON(&sc);
+				}
+				doc ~= "]}";
+				auto docjson = parseJSON(doc.idup);
+				string docstr = toJSON(&docjson, true); 
+				File file = File("scores.json", "w");
+				file.write(docstr);
+
+				char[] top;
+				ulong start = 0;
+
+				foreach(i, name; sortedscore) {
+					if(name == nick.idup) {
+						if(i > 3)
+							start = i - 2;
+						break;
+					}
+				}						
+				
+				for(ulong i = start; i < start+5; ++i) {
+					if(i >= sortedscore.length)
+						break;
+					string pos;
+					if(i == 0)
+						pos = "1st";
+					else if(i == 1)
+						pos = "2nd";
+					else if(i == 2)
+						pos = "3rd";
+					else
+						pos = to!string(i+1) ~ "th";
+					top ~= pos ~ ": " ~ sortedscore[i] ~ "(" ~ to!string(score[sortedscore[i]]) ~ ") ";
+					//writefln("%s -> %s", sortedscore, score[sortedscore]);
+				}
+				Privmsg(("Rankings: " ~ top).idup);
+
+				Scramble();
+				stopWatch.reset();
+				inactivityStopWatch.reset();
+			}
+		}
+	}
+	
+	void DisconnectIfBotQuits(char[] command, char[] nick) {
+		if(command == "QUIT" && nick == this.nick) {
 			Disconnect();
 		}
 	}
@@ -343,6 +313,16 @@ public:
 		}
 	}
 
+	void Reveal(ulong n) {
+		for(int i = 0; i < n; ++i) {
+			ulong p = uniform(0, currentword.length - hintcount);
+			while(hint[p] != '_')
+				++p;
+			hint[p] = currentword[p];
+			++hintcount;
+		}
+	}
+
 	void StopIfTimeLimitReached() {
 		if(stopWatch.running && stopWatch.peek().seconds > 40) {
 			Privmsg("Time's up, the word was: " ~ to!string(currentword));
@@ -354,5 +334,32 @@ public:
 			}
 			stopWatch.reset();
 		}
+	}
+
+	void Stop() {
+		stopWatch.stop();
+		currentword = [];
+	}
+
+	void RespondToPing(char[] receivebuffer) {
+		if(startsWith(receivebuffer, "PING")) {
+			receivebuffer[1] = 'O';
+			Send(receivebuffer.dup);
+		}
+	}
+
+	void Scramble() {
+		hintlevel = 0;
+		hintcount = 0;
+		ulong number = uniform(0, dictionary.length);
+		currentword = dictionary[number].dup;
+		shuffledword = dictionary[number].dup;
+		randomShuffle(shuffledword);
+		hint.length = currentword.length;
+		for(int i = 0; i < currentword.length; ++i) {
+			hint[i] = to!dchar('_');
+		}
+		Privmsg("Unscramble: " ~ to!string(shuffledword));
+		writeln("Word: " ~ to!string(currentword));
 	}
 }
