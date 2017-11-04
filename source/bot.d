@@ -222,81 +222,105 @@ public:
 					return;
 				}
 			}
-			if(message.message == "!help") {
-				Privmsg("Available commands: !start, !stop, !hints on, !hints off");
-			}
-			if(message.message == "!stop") {
-				Privmsg("Stopping, use !start to play. The last word was: " ~ to!string(currentword));
-				Stop();
-			}
-			if(message.message == "!start") {
-				Scramble();
-				stopWatch.start();
-				inactivityStopWatch.start();
-				inactivityStopWatch.reset();
-			}
-			if(message.message == "!hints on") {
-				hints_enabled = true;
-				Privmsg("Hints are enabled");
-			}
-			if(message.message == "!hints off") {
-				hints_enabled = false;
-				Privmsg("Hints are disabled");
-			}
-			if(toLower(strip(message.message)) == toLower(to!string(currentword))) {
-				score[message.nick.idup]++;
-				Privmsg(message.nick.idup ~ " is correct: " ~ to!string(currentword));
+			ShowHelp(message);
+			TurnHintsOff(message);
+			TurnHintsOn(message);
+			StartGame(message);
+			StopGame(message);
+			HandleGuess(message);
+		}
+	}
 
-				string[] sortedscore = score.keys;
-				sort!((a,b) {return score[a] > score[b];})(sortedscore);
-				
-				char[] doc = "{\"scores\":[".dup;
-				foreach(i, name; sortedscore) {
-					if(i>0)
-						doc ~= ",";
-					JSONValue sc = parseJSON("{}");
-					sc.object["nick"] = name;
-					sc.object["score"] = score[sortedscore[i]];
-					doc ~= toJSON(&sc);
+	void ShowHelp(Message message) {
+		if(message.message == "!help") {
+			Privmsg("Available commands: !start, !stop, !hints on, !hints off");
+		}
+	}
+
+	void TurnHintsOff(Message message) {
+		if(message.message == "!hints off") {
+			hints_enabled = false;
+			Privmsg("Hints are disabled");
+		}
+	}
+
+	void TurnHintsOn(Message message) {
+		if(message.message == "!hints on") {
+			hints_enabled = true;
+			Privmsg("Hints are enabled");
+		}
+	}
+
+	void StartGame(Message message) {
+		if(message.message == "!start") {
+			Scramble();
+			stopWatch.start();
+			inactivityStopWatch.start();
+			inactivityStopWatch.reset();
+		}
+	}
+
+	void StopGame(Message message) {
+		if(message.message == "!stop") {
+			Privmsg("Stopping, use !start to play. The last word was: " ~ to!string(currentword));
+			Stop();
+		}
+	}
+
+	void HandleGuess(Message message) {
+		if(toLower(strip(message.message)) == toLower(to!string(currentword))) {
+			score[message.nick.idup]++;
+			Privmsg(message.nick.idup ~ " is correct: " ~ to!string(currentword));
+
+			string[] sortedscore = score.keys;
+			sort!((a,b) {return score[a] > score[b];})(sortedscore);
+			
+			char[] doc = "{\"scores\":[".dup;
+			foreach(i, name; sortedscore) {
+				if(i>0)
+					doc ~= ",";
+				JSONValue sc = parseJSON("{}");
+				sc.object["nick"] = name;
+				sc.object["score"] = score[sortedscore[i]];
+				doc ~= toJSON(&sc);
+			}
+			doc ~= "]}";
+			auto docjson = parseJSON(doc.idup);
+			string docstr = toJSON(&docjson, true); 
+			File file = File("scores.json", "w");
+			file.write(docstr);
+
+			char[] top;
+			ulong start = 0;
+
+			foreach(i, name; sortedscore) {
+				if(name == message.nick.idup) {
+					if(i > 3)
+						start = i - 2;
+					break;
 				}
-				doc ~= "]}";
-				auto docjson = parseJSON(doc.idup);
-				string docstr = toJSON(&docjson, true); 
-				File file = File("scores.json", "w");
-				file.write(docstr);
-
-				char[] top;
-				ulong start = 0;
-
-				foreach(i, name; sortedscore) {
-					if(name == message.nick.idup) {
-						if(i > 3)
-							start = i - 2;
-						break;
-					}
-				}						
-				
-				for(ulong i = start; i < start+5; ++i) {
-					if(i >= sortedscore.length)
-						break;
-					string pos;
-					if(i == 0)
-						pos = "1st";
-					else if(i == 1)
-						pos = "2nd";
-					else if(i == 2)
-						pos = "3rd";
-					else
-						pos = to!string(i+1) ~ "th";
-					top ~= pos ~ ": " ~ sortedscore[i] ~ "(" ~ to!string(score[sortedscore[i]]) ~ ") ";
-					//writefln("%s -> %s", sortedscore, score[sortedscore]);
-				}
-				Privmsg(("Rankings: " ~ top).idup);
-
-				Scramble();
-				stopWatch.reset();
-				inactivityStopWatch.reset();
+			}						
+			
+			for(ulong i = start; i < start+5; ++i) {
+				if(i >= sortedscore.length)
+					break;
+				string pos;
+				if(i == 0)
+					pos = "1st";
+				else if(i == 1)
+					pos = "2nd";
+				else if(i == 2)
+					pos = "3rd";
+				else
+					pos = to!string(i+1) ~ "th";
+				top ~= pos ~ ": " ~ sortedscore[i] ~ "(" ~ to!string(score[sortedscore[i]]) ~ ") ";
+				//writefln("%s -> %s", sortedscore, score[sortedscore]);
 			}
+			Privmsg(("Rankings: " ~ top).idup);
+
+			Scramble();
+			stopWatch.reset();
+			inactivityStopWatch.reset();
 		}
 	}
 	
