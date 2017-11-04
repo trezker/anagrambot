@@ -51,8 +51,8 @@ private:
 	InternetAddress address;
 	string nick;
 	dstring[] dictionary;
-	StopWatch inactivitysw;
-	StopWatch sw;
+	StopWatch inactivityStopWatch;
+	StopWatch stopWatch;
 	dchar[] currentword;
 	dchar[] shuffledword;
 	dchar[] hint;
@@ -159,45 +159,25 @@ public:
 	}
 	
 	void Stop() {
-		sw.stop();
+		stopWatch.stop();
 		currentword = [];
 	}
-	
+
+	void RespondToPing(char[] receivebuffer) {
+		if(startsWith(receivebuffer, "PING")) {
+			receivebuffer[1] = 'O';
+			Send(receivebuffer.dup);
+		}
+	}
+
 	void Update() nothrow {
 		try {
-			if(hints_enabled) {
-				if(hintlevel == 0 && sw.running && sw.peek().seconds > 10) {
-					int numreveal = to!int(currentword.length * 0.2);
-					++hintlevel;
-					Reveal(numreveal);
-					Privmsg("Hint 1: " ~ to!string(hint));
-				}
-				if(hintlevel == 1 && sw.running && sw.peek().seconds > 20) {
-					++hintlevel;
-					int numreveal = to!int((currentword.length-hintcount) * 0.3);
-					Reveal(numreveal);
-					Privmsg("Hint 2: " ~ to!string(hint));
-				}
-				if(hintlevel == 2 && sw.running && sw.peek().seconds > 30) {
-					++hintlevel;
-					int numreveal = to!int((currentword.length-hintcount) * 0.4);
-					Reveal(numreveal);
-					Privmsg("Hint 3: " ~ to!string(hint));
-				}
-			}
-			if(sw.running && sw.peek().seconds > 40) {
-				Privmsg("Time's up, the word was: " ~ to!string(currentword));
-				if(inactivitysw.peek().seconds() > 600) {
-					Privmsg("Ten minutes inactivity, stopping the game.");
-					Stop();
-				} else {
-					Scramble();
-				}
-				sw.reset();
-			}
+			ShowHintsIfEnabled();
+			StopIfTimeLimitReached();
 
 			char[1024] buffer;
 			auto received = socket.receive(buffer);
+
 			if(received == Socket.ERROR) {
 				return;
 			}
@@ -206,13 +186,11 @@ public:
 				return;
 			}
 			
+
 			auto receivebuffer = buffer[0 .. received];
 			writeln(">", receivebuffer);
 			
-			if(startsWith(receivebuffer, "PING")) {
-				receivebuffer[1] = 'O';
-				Send(receivebuffer.dup);
-			}
+			RespondToPing(receivebuffer);
 			
 			auto nickend = indexOf(receivebuffer, "!");
 			auto peerend = indexOf(receivebuffer, " ");
@@ -261,9 +239,9 @@ public:
 					}
 					if(message == "!start") {
 						Scramble();
-						sw.start();
-						inactivitysw.start();
-						inactivitysw.reset();
+						stopWatch.start();
+						inactivityStopWatch.start();
+						inactivityStopWatch.reset();
 					}
 					if(message == "!hints on") {
 						hints_enabled = true;
@@ -325,8 +303,8 @@ public:
 						
 
 						Scramble();
-						sw.reset();
-						inactivitysw.reset();
+						stopWatch.reset();
+						inactivityStopWatch.reset();
 					}
 				}
 			}
@@ -339,6 +317,42 @@ public:
 			catch(Exception ee) {
 			}
 			Disconnect();
+		}
+	}
+
+	void ShowHintsIfEnabled() {
+		if(hints_enabled) {
+			if(hintlevel == 0 && stopWatch.running && stopWatch.peek().seconds > 10) {
+				int numreveal = to!int(currentword.length * 0.2);
+				++hintlevel;
+				Reveal(numreveal);
+				Privmsg("Hint 1: " ~ to!string(hint));
+			}
+			if(hintlevel == 1 && stopWatch.running && stopWatch.peek().seconds > 20) {
+				++hintlevel;
+				int numreveal = to!int((currentword.length-hintcount) * 0.3);
+				Reveal(numreveal);
+				Privmsg("Hint 2: " ~ to!string(hint));
+			}
+			if(hintlevel == 2 && stopWatch.running && stopWatch.peek().seconds > 30) {
+				++hintlevel;
+				int numreveal = to!int((currentword.length-hintcount) * 0.4);
+				Reveal(numreveal);
+				Privmsg("Hint 3: " ~ to!string(hint));
+			}
+		}
+	}
+
+	void StopIfTimeLimitReached() {
+		if(stopWatch.running && stopWatch.peek().seconds > 40) {
+			Privmsg("Time's up, the word was: " ~ to!string(currentword));
+			if(inactivityStopWatch.peek().seconds() > 600) {
+				Privmsg("Ten minutes inactivity, stopping the game.");
+				Stop();
+			} else {
+				Scramble();
+			}
+			stopWatch.reset();
 		}
 	}
 }

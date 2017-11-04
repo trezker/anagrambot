@@ -46,7 +46,7 @@ void main() {
 			try {
 				bot = new Bot(new TcpSocket(), dict);
 				auto address = new InternetAddress("irc.freenode.net", 6667);
-				bot.Connect(address, "ragaman", "##anagram");
+				bot.Connect(address, "ragaman", "##anagram_game");
 			}
 			catch(Exception e) {
 				writeln(e.msg);
