@@ -42,6 +42,14 @@ import std.file;
  * 	Points
 */
 
+class Message {
+	char[] nick;
+	char[] peer;
+	char[] command;
+	char[] channel;
+	char[] message;
+}
+
 class Bot {
 private:
 	Socket socket;
@@ -152,37 +160,12 @@ public:
 			
 			auto receivebuffer = buffer[0 .. received];
 			writeln(">", receivebuffer);
-			
 			RespondToPing(receivebuffer);
 			
-			auto nickend = indexOf(receivebuffer, "!");
-			auto peerend = indexOf(receivebuffer, " ");
-			if(nickend > -1 && startsWith(receivebuffer, ":") && nickend < peerend) {
-				char[] nick;
-				char[] peer;
-				char[] command;
-				char[] channel;
-				char[] message;
-				receivebuffer = stripRight(receivebuffer);
-				nick = receivebuffer[1 .. nickend];
-				peer = receivebuffer[nickend + 1 .. peerend];
-				auto rbs = split(receivebuffer, ' ');
-				command = rbs[1];
-				channel = rbs[2];
-				
-				auto channelend = indexOf(receivebuffer, channel);
-				if(channelend > -1 && channelend + channel.length + 2 < receivebuffer.length) {
-					message = receivebuffer[channelend + channel.length + 2 .. $];
-				}
-				
-				writefln("Nick: '%s'", nick);
-				writefln("Peer: '%s'", peer);
-				writefln("Command: '%s'", command);
-				writefln("Channel: '%s'", channel);
-				writefln("Message: '%s'", message);
-				
-				DisconnectIfBotQuits(command, nick);
-				HandleMessage(command, message, nick);
+			Message message = ParseMessage(receivebuffer);
+			if(message !is null) {
+				DisconnectIfBotQuits(message);
+				HandleMessage(message);
 			}
 		}
 		catch(Exception e) {
@@ -196,40 +179,73 @@ public:
 		}
 	}
 
-	void HandleMessage(char[] command, char[] message, char[] nick) {
-		if(command == "PRIVMSG") {
-			if(nick == "Trezker") {
-				if(message == "!quit") {
+	Message ParseMessage(char[] receivebuffer) {
+		auto nickend = indexOf(receivebuffer, "!");
+		auto peerend = indexOf(receivebuffer, " ");
+		if(nickend > -1 && startsWith(receivebuffer, ":") && nickend < peerend) {
+			Message message = new Message;
+			receivebuffer = stripRight(receivebuffer);
+			message.nick = receivebuffer[1 .. nickend];
+			message.peer = receivebuffer[nickend + 1 .. peerend];
+			auto rbs = split(receivebuffer, ' ');
+			message.command = rbs[1];
+			message.channel = rbs[2];
+			
+			auto channelend = indexOf(receivebuffer, channel);
+			if(channelend > -1 && channelend + channel.length + 2 < receivebuffer.length) {
+				message.message = receivebuffer[channelend + channel.length + 2 .. $];
+			}
+			
+			writefln("Nick: '%s'", message.nick);
+			writefln("Peer: '%s'", message.peer);
+			writefln("Command: '%s'", message.command);
+			writefln("Channel: '%s'", message.channel);
+			writefln("Message: '%s'", message.message);
+			return message;
+		}
+		return null;
+	}
+	
+	void DisconnectIfBotQuits(Message message) {
+		if(message.command == "QUIT" && message.nick == this.nick) {
+			Disconnect();
+		}
+	}
+
+	void HandleMessage(Message message) {
+		if(message.command == "PRIVMSG") {
+			if(message.nick == "Trezker") {
+				if(message.message == "!quit") {
 					Privmsg("Shutting down");
 					Disconnect();
 					exit = true;
 					return;
 				}
 			}
-			if(message == "!help") {
+			if(message.message == "!help") {
 				Privmsg("Available commands: !start, !stop, !hints on, !hints off");
 			}
-			if(message == "!stop") {
+			if(message.message == "!stop") {
 				Privmsg("Stopping, use !start to play. The last word was: " ~ to!string(currentword));
 				Stop();
 			}
-			if(message == "!start") {
+			if(message.message == "!start") {
 				Scramble();
 				stopWatch.start();
 				inactivityStopWatch.start();
 				inactivityStopWatch.reset();
 			}
-			if(message == "!hints on") {
+			if(message.message == "!hints on") {
 				hints_enabled = true;
 				Privmsg("Hints are enabled");
 			}
-			if(message == "!hints off") {
+			if(message.message == "!hints off") {
 				hints_enabled = false;
 				Privmsg("Hints are disabled");
 			}
-			if(toLower(strip(message)) == toLower(to!string(currentword))) {
-				score[nick.idup]++;
-				Privmsg(nick.idup ~ " is correct: " ~ to!string(currentword));
+			if(toLower(strip(message.message)) == toLower(to!string(currentword))) {
+				score[message.nick.idup]++;
+				Privmsg(message.nick.idup ~ " is correct: " ~ to!string(currentword));
 
 				string[] sortedscore = score.keys;
 				sort!((a,b) {return score[a] > score[b];})(sortedscore);
@@ -253,7 +269,7 @@ public:
 				ulong start = 0;
 
 				foreach(i, name; sortedscore) {
-					if(name == nick.idup) {
+					if(name == message.nick.idup) {
 						if(i > 3)
 							start = i - 2;
 						break;
@@ -284,12 +300,6 @@ public:
 		}
 	}
 	
-	void DisconnectIfBotQuits(char[] command, char[] nick) {
-		if(command == "QUIT" && nick == this.nick) {
-			Disconnect();
-		}
-	}
-
 	void ShowHintsIfEnabled() {
 		if(hints_enabled) {
 			if(hintlevel == 0 && stopWatch.running && stopWatch.peek().seconds > 10) {
