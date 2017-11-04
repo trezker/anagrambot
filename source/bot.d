@@ -227,13 +227,14 @@ public:
 			TurnHintsOn(message);
 			StartGame(message);
 			StopGame(message);
+			ShowScores(message);
 			HandleGuess(message);
 		}
 	}
 
 	void ShowHelp(Message message) {
 		if(message.message == "!help") {
-			Privmsg("Available commands: !start, !stop, !hints on, !hints off");
+			Privmsg("Available commands: !start, !stop, !hints on, !hints off, !scores");
 		}
 	}
 
@@ -267,13 +268,18 @@ public:
 		}
 	}
 
+	void ShowScores(Message message) {
+		if(message.message == "!scores") {
+			ShowScoresFromPosition(0, NicksSortedByScore());
+		}
+	}
+
 	void HandleGuess(Message message) {
 		if(toLower(strip(message.message)) == toLower(to!string(currentword))) {
 			score[message.nick.idup]++;
 			Privmsg(message.nick.idup ~ " is correct: " ~ to!string(currentword));
 
-			string[] sortedscore = score.keys;
-			sort!((a,b) {return score[a] > score[b];})(sortedscore);
+			string[] sortedscore = NicksSortedByScore();
 			
 			char[] doc = "{\"scores\":[".dup;
 			foreach(i, name; sortedscore) {
@@ -290,7 +296,6 @@ public:
 			File file = File("scores.json", "w");
 			file.write(docstr);
 
-			char[] top;
 			ulong start = 0;
 
 			foreach(i, name; sortedscore) {
@@ -300,28 +305,38 @@ public:
 					break;
 				}
 			}						
-			
-			for(ulong i = start; i < start+5; ++i) {
-				if(i >= sortedscore.length)
-					break;
-				string pos;
-				if(i == 0)
-					pos = "1st";
-				else if(i == 1)
-					pos = "2nd";
-				else if(i == 2)
-					pos = "3rd";
-				else
-					pos = to!string(i+1) ~ "th";
-				top ~= pos ~ ": " ~ sortedscore[i] ~ "(" ~ to!string(score[sortedscore[i]]) ~ ") ";
-				//writefln("%s -> %s", sortedscore, score[sortedscore]);
-			}
-			Privmsg(("Rankings: " ~ top).idup);
+
+			ShowScoresFromPosition(start, sortedscore);
 
 			Scramble();
 			stopWatch.reset();
 			inactivityStopWatch.reset();
 		}
+	}
+
+	string[] NicksSortedByScore() {
+		string[] sortedscore = score.keys;
+		sort!((a,b) {return score[a] > score[b];})(sortedscore);
+		return sortedscore;
+	}
+
+	void ShowScoresFromPosition(ulong start, string[] sortedscore) {
+		char[] top;
+		for(ulong i = start; i < start+5; ++i) {
+			if(i >= sortedscore.length)
+				break;
+			string pos;
+			if(i == 0)
+				pos = "1st";
+			else if(i == 1)
+				pos = "2nd";
+			else if(i == 2)
+				pos = "3rd";
+			else
+				pos = to!string(i+1) ~ "th";
+			top ~= pos ~ ": " ~ sortedscore[i] ~ "(" ~ to!string(score[sortedscore[i]]) ~ ") ";
+		}
+		Privmsg(("Rankings: " ~ top).idup);
 	}
 	
 	void ShowHintsIfEnabled() {
