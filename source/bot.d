@@ -222,6 +222,7 @@ public:
 					return;
 				}
 			}
+			Merge(message);
 			ShowHelp(message);
 			TurnHintsOff(message);
 			TurnHintsOn(message);
@@ -230,6 +231,44 @@ public:
 			ShowScores(message);
 			HandleGuess(message);
 		}
+	}
+
+	void Merge(Message message) {
+		auto messageParts = split(message.message, ' ');
+
+		if(messageParts[0] != "!merge") {
+			return;
+		}
+
+		if(message.nick != "Trezker") {
+			ShowPermissionDenied();
+			return;
+		}
+
+		if(messageParts.length != 3) {
+			ShowMergeHelp();
+			return;
+		}
+
+		string from = messageParts[1].idup;
+		string to = messageParts[2].idup;
+
+		if(!((from in score) && (to in score))) {
+			ShowMergeHelp();
+			return;
+		}
+
+		score[to] += score[from];
+		score.remove(from);
+		SaveScore();
+	}
+
+	void ShowPermissionDenied() {
+		Privmsg("Permission denied");
+	}
+
+	void ShowMergeHelp() {
+		Privmsg("!merge [from] [to]");
 	}
 
 	void ShowHelp(Message message) {
@@ -288,23 +327,9 @@ public:
 			score[message.nick.idup]++;
 			Privmsg(message.nick.idup ~ " is correct: " ~ to!string(currentword));
 
-			string[] sortedscore = NicksSortedByScore();
-			
-			char[] doc = "{\"scores\":[".dup;
-			foreach(i, name; sortedscore) {
-				if(i>0)
-					doc ~= ",";
-				JSONValue sc = parseJSON("{}");
-				sc.object["nick"] = name;
-				sc.object["score"] = score[sortedscore[i]];
-				doc ~= toJSON(&sc);
-			}
-			doc ~= "]}";
-			auto docjson = parseJSON(doc.idup);
-			string docstr = toJSON(&docjson, true); 
-			File file = File("scores.json", "w");
-			file.write(docstr);
+			SaveScore();
 
+			string[] sortedscore = NicksSortedByScore();
 			ulong start = 0;
 
 			foreach(i, name; sortedscore) {
@@ -313,14 +338,31 @@ public:
 						start = i - 2;
 					break;
 				}
-			}						
-
+			}
 			ShowScoresFromPosition(start, sortedscore);
 
 			Scramble();
 			stopWatch.reset();
 			inactivityStopWatch.reset();
 		}
+	}
+
+	void SaveScore() {
+		string[] sortedscore = NicksSortedByScore();
+		char[] doc = "{\"scores\":[".dup;
+		foreach(i, name; sortedscore) {
+			if(i>0)
+				doc ~= ",";
+			JSONValue sc = parseJSON("{}");
+			sc.object["nick"] = name;
+			sc.object["score"] = score[sortedscore[i]];
+			doc ~= toJSON(&sc);
+		}
+		doc ~= "]}";
+		auto docjson = parseJSON(doc.idup);
+		string docstr = toJSON(&docjson, true); 
+		File file = File("scores.json", "w");
+		file.write(docstr);
 	}
 
 	string[] NicksSortedByScore() {
