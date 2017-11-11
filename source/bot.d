@@ -323,6 +323,9 @@ public:
 	}
 
 	void HandleGuess(Message message) {
+		if(!stopWatch.running()) {
+			return;
+		}
 		if(toLower(strip(message.message)) == toLower(to!string(currentword))) {
 			score[message.nick.idup]++;
 			Privmsg(message.nick.idup ~ " is correct: " ~ to!string(currentword));
